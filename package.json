@@ -1,0 +1,20 @@
+{
+  "name": "personal-crm",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev:api",
+    "dev:api": "npm run start:dev -w @crm/api",
+    "dev:web": "npm run dev -w @crm/web",
+    "build": "npm run build -w @crm/api && npm run build -w @crm/web",
+    "lint": "npm run lint -w @crm/api && npm run lint -w @crm/web",
+    "test": "npm run test -w @crm/api",
+    "prisma:generate": "npm run prisma:generate -w @crm/api",
+    "prisma:migrate": "npm run prisma:migrate -w @crm/api",
+    "prisma:seed": "npm run prisma:seed -w @crm/api"
+  }
+}
