@@ -96,3 +96,7 @@ npm.cmd run build
 ```
 
 PowerShell на этой машине блокирует `npm.ps1`, поэтому используйте `npm.cmd`.
+
+## VPS deployment
+
+Первый staging-деплой описан в [docs/DEPLOY_VPS.md](docs/DEPLOY_VPS.md).

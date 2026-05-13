@@ -6,12 +6,12 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.production.example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tsbuildinfo
 apps/api/generated/
-apps/api/prisma/migrations/
 .worktrees/
 worktrees/
