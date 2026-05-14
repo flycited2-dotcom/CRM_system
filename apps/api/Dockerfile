@@ -23,6 +23,7 @@ WORKDIR /app/apps/api
 
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/package.json /app/package-lock.json /app/
+COPY --from=builder /app/apps/api/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/prisma ./prisma
