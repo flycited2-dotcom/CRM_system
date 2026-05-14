@@ -37,7 +37,7 @@ services:
         condition: service_healthy
     expose:
       - "4000"
-    command: sh -c "npm run prisma:deploy && node dist/main.js"
+    command: sh -c "npm run prisma:deploy && node dist/src/main.js"
 
   web:
     build:
