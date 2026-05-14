@@ -1,11 +1,13 @@
 FROM node:22-alpine AS builder
 
+ENV NPM_CONFIG_AUDIT=false
+ENV NPM_CONFIG_FUND=false
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
-COPY apps/web/package.json apps/web/package.json
-RUN npm ci
+RUN npm ci --workspace @crm/api --include-workspace-root
 
 COPY . .
 RUN npm run prisma:generate -w @crm/api
@@ -14,6 +16,9 @@ RUN npm run build -w @crm/api
 FROM node:22-alpine AS runner
 
 ENV NODE_ENV=production
+ENV NPM_CONFIG_AUDIT=false
+ENV NPM_CONFIG_FUND=false
+
 WORKDIR /app/apps/api
 
 COPY --from=builder /app/node_modules /app/node_modules

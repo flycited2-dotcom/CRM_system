@@ -1,14 +1,16 @@
 FROM node:22-alpine AS builder
 
+ENV NPM_CONFIG_AUDIT=false
+ENV NPM_CONFIG_FUND=false
+
 WORKDIR /app
 
 ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY package.json package-lock.json ./
-COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN npm ci
+RUN npm ci --workspace @crm/web --include-workspace-root
 
 COPY . .
 RUN npm run build -w @crm/web
