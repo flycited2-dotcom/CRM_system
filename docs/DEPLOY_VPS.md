@@ -10,7 +10,7 @@
 - 2 CPU.
 - 4 GB RAM.
 - 30-50 GB SSD.
-- Открыт порт `80`.
+- Открыт порт `80` или выбранный внешний порт `CRM_HTTP_PORT` для staging на сервере с уже занятым `80`.
 - Доступ по SSH.
 - Установлены `git`, Docker и Docker Compose plugin.
 
@@ -69,6 +69,15 @@ nano .env.production
 
 ```env
 WEB_ORIGIN=http://SERVER_IP
+CRM_HTTP_PORT=80
+NEXT_PUBLIC_API_URL=/api
+```
+
+Если на VPS уже занят порт `80`, например текущим Hestia/Nginx, используйте отдельный staging-порт:
+
+```env
+WEB_ORIGIN=http://SERVER_IP:8090
+CRM_HTTP_PORT=8090
 NEXT_PUBLIC_API_URL=/api
 ```
 
@@ -117,7 +126,7 @@ Seed создает стартовые роли, permissions и owner-польз
 API health:
 
 ```bash
-curl http://SERVER_IP/api/health
+curl http://SERVER_IP:${CRM_HTTP_PORT:-80}/api/health
 ```
 
 Ожидаемый ответ:
@@ -129,13 +138,13 @@ curl http://SERVER_IP/api/health
 Swagger:
 
 ```text
-http://SERVER_IP/api/docs
+http://SERVER_IP:${CRM_HTTP_PORT:-80}/api/docs
 ```
 
 Web:
 
 ```text
-http://SERVER_IP
+http://SERVER_IP:${CRM_HTTP_PORT:-80}
 ```
 
 Проверить вручную:
@@ -188,7 +197,7 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec postgr
 
 ## 10. SSL и домен
 
-Текущий compose открывает HTTP на порту `80`. Для staging этого достаточно. Для боевого доступа нужно добавить домен и SSL одним из вариантов:
+Текущий compose открывает HTTP на порту `${CRM_HTTP_PORT:-80}`. Для staging этого достаточно. Для боевого доступа нужно добавить домен и SSL одним из вариантов:
 
 - внешний Nginx на VPS + Certbot;
 - Traefik/Caddy перед compose;
