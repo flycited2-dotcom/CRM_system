@@ -13,6 +13,12 @@ const permissions = [
   ['clients.create', 'Создание клиентов'],
   ['clients.update', 'Редактирование клиентов'],
   ['clients.delete', 'Удаление клиентов'],
+  ['leads.view', 'Просмотр лидов'],
+  ['leads.create', 'Создание лидов'],
+  ['leads.update', 'Редактирование лидов'],
+  ['leads.delete', 'Удаление лидов'],
+  ['leads.assign', 'Назначение лидов'],
+  ['leads.convert', 'Конвертация лидов'],
   ['roles.view', 'Просмотр ролей'],
   ['work_sessions.view', 'Просмотр рабочих сессий'],
   ['audit.view', 'Просмотр журнала действий'],
@@ -76,7 +82,12 @@ async function main() {
       'audit.view',
       'clients.view',
       'clients.create',
-      'clients.update'
+      'clients.update',
+      'leads.view',
+      'leads.create',
+      'leads.update',
+      'leads.assign',
+      'leads.convert'
     ].includes(permission.code)
   );
 
@@ -97,7 +108,15 @@ async function main() {
   }
 
   const managerPermissions = allPermissions.filter((permission) =>
-    ['clients.view', 'clients.create', 'clients.update'].includes(permission.code)
+    [
+      'clients.view',
+      'clients.create',
+      'clients.update',
+      'leads.view',
+      'leads.create',
+      'leads.update',
+      'leads.convert'
+    ].includes(permission.code)
   );
 
   for (const permission of managerPermissions) {

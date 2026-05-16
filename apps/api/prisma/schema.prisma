@@ -38,6 +38,14 @@ enum ClientContactType {
   other
 }
 
+enum LeadStatus {
+  new
+  assigned
+  in_progress
+  converted
+  closed
+}
+
 model User {
   id             String         @id @default(uuid()) @db.Uuid
   fullName       String         @map("full_name")
@@ -60,6 +68,7 @@ model User {
   workSessions   WorkSession[]
   activityLogs   ActivityLog[]
   assignedClients Client[]       @relation("ClientResponsible")
+  assignedLeads   Lead[]         @relation("LeadResponsible")
   clientComments ClientComment[] @relation("ClientCommentAuthor")
   clientFiles    ClientFile[]    @relation("ClientFileUploader")
 
@@ -173,12 +182,57 @@ model Client {
   contacts          ClientContact[]
   comments          ClientComment[]
   files             ClientFile[]
+  leads             Lead[]
 
   @@index([responsibleUserId])
   @@index([status, type])
   @@index([source])
   @@index([city])
   @@map("clients")
+}
+
+model Lead {
+  id                String     @id @default(uuid()) @db.Uuid
+  source            String?
+  site              String?
+  pageUrl           String?    @map("page_url")
+  utmSource         String?    @map("utm_source")
+  utmMedium         String?    @map("utm_medium")
+  utmCampaign       String?    @map("utm_campaign")
+  utmContent        String?    @map("utm_content")
+  utmTerm           String?    @map("utm_term")
+  name              String?
+  phone             String?
+  email             String?
+  telegram          String?
+  message           String?
+  productInterest   String?    @map("product_interest")
+  city              String?
+  ipAddress         String?    @map("ip_address")
+  status            LeadStatus @default(new)
+  responsibleUserId String?    @map("responsible_user_id") @db.Uuid
+  responsibleUser   User?      @relation("LeadResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  clientId          String?    @map("client_id") @db.Uuid
+  client            Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  dealId            String?    @map("deal_id") @db.Uuid
+  receivedAt        DateTime   @default(now()) @map("received_at")
+  firstResponseAt   DateTime?  @map("first_response_at")
+  closedAt          DateTime?  @map("closed_at")
+  closeReason       String?    @map("close_reason")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  deletedAt         DateTime?  @map("deleted_at")
+  createdBy         String?    @map("created_by") @db.Uuid
+  updatedBy         String?    @map("updated_by") @db.Uuid
+
+  @@index([status])
+  @@index([responsibleUserId])
+  @@index([clientId])
+  @@index([receivedAt])
+  @@index([deletedAt])
+  @@index([source])
+  @@index([city])
+  @@map("leads")
 }
 
 model ClientContact {
