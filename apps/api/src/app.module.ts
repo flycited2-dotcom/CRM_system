@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { ClientsModule } from './clients/clients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesModule } from './roles/roles.module';
 import { UsersModule } from './users/users.module';
@@ -34,6 +35,7 @@ import { WorkSessionsModule } from './work-sessions/work-sessions.module';
     AuditModule,
     WorkSessionsModule,
     AuthModule,
+    ClientsModule,
     UsersModule,
     RolesModule
   ],
