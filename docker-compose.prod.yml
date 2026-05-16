@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - crm_uploads:/app/uploads
     expose:
       - "4000"
     command: sh -c "npm run prisma:deploy && node dist/src/main.js"
@@ -65,3 +67,4 @@ services:
 volumes:
   crm_postgres_data:
   crm_redis_data:
+  crm_uploads:

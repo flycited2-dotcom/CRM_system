@@ -9,6 +9,10 @@ const permissions = [
   ['users.update', 'Редактирование пользователей'],
   ['users.delete', 'Удаление пользователей'],
   ['users.block', 'Блокировка пользователей'],
+  ['clients.view', 'Просмотр клиентов'],
+  ['clients.create', 'Создание клиентов'],
+  ['clients.update', 'Редактирование клиентов'],
+  ['clients.delete', 'Удаление клиентов'],
   ['roles.view', 'Просмотр ролей'],
   ['work_sessions.view', 'Просмотр рабочих сессий'],
   ['audit.view', 'Просмотр журнала действий'],
@@ -44,6 +48,7 @@ async function main() {
   const ownerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'owner' } });
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { code: 'admin' } });
   const managerHeadRole = await prisma.role.findUniqueOrThrow({ where: { code: 'manager_head' } });
+  const managerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'manager' } });
 
   for (const role of [ownerRole, adminRole]) {
     for (const permission of allPermissions) {
@@ -64,7 +69,15 @@ async function main() {
   }
 
   const managerHeadPermissions = allPermissions.filter((permission) =>
-    ['users.view', 'roles.view', 'work_sessions.view', 'audit.view'].includes(permission.code)
+    [
+      'users.view',
+      'roles.view',
+      'work_sessions.view',
+      'audit.view',
+      'clients.view',
+      'clients.create',
+      'clients.update'
+    ].includes(permission.code)
   );
 
   for (const permission of managerHeadPermissions) {
@@ -78,6 +91,26 @@ async function main() {
       update: {},
       create: {
         roleId: managerHeadRole.id,
+        permissionId: permission.id
+      }
+    });
+  }
+
+  const managerPermissions = allPermissions.filter((permission) =>
+    ['clients.view', 'clients.create', 'clients.update'].includes(permission.code)
+  );
+
+  for (const permission of managerPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: managerRole.id,
+          permissionId: permission.id
+        }
+      },
+      update: {},
+      create: {
+        roleId: managerRole.id,
         permissionId: permission.id
       }
     });

@@ -18,6 +18,26 @@ enum WorkSessionStatus {
   closed
 }
 
+enum ClientType {
+  individual
+  company
+}
+
+enum ClientStatus {
+  active
+  inactive
+  archived
+}
+
+enum ClientContactType {
+  phone
+  email
+  telegram
+  max
+  whatsapp
+  other
+}
+
 model User {
   id             String         @id @default(uuid()) @db.Uuid
   fullName       String         @map("full_name")
@@ -39,6 +59,9 @@ model User {
   refreshTokens  RefreshToken[]
   workSessions   WorkSession[]
   activityLogs   ActivityLog[]
+  assignedClients Client[]       @relation("ClientResponsible")
+  clientComments ClientComment[] @relation("ClientCommentAuthor")
+  clientFiles    ClientFile[]    @relation("ClientFileUploader")
 
   @@map("users")
 }
@@ -125,4 +148,84 @@ model ActivityLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@map("activity_logs")
+}
+
+model Client {
+  id                String          @id @default(uuid()) @db.Uuid
+  type              ClientType
+  status            ClientStatus    @default(active)
+  name              String
+  inn               String?
+  kpp               String?
+  ogrn              String?
+  legalAddress      String?         @map("legal_address")
+  actualAddress     String?         @map("actual_address")
+  city              String?
+  source            String?
+  responsibleUserId String?         @map("responsible_user_id") @db.Uuid
+  responsibleUser   User?           @relation("ClientResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  comment           String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  createdBy         String?         @map("created_by") @db.Uuid
+  updatedBy         String?         @map("updated_by") @db.Uuid
+  contacts          ClientContact[]
+  comments          ClientComment[]
+  files             ClientFile[]
+
+  @@index([responsibleUserId])
+  @@index([status, type])
+  @@index([source])
+  @@index([city])
+  @@map("clients")
+}
+
+model ClientContact {
+  id          String            @id @default(uuid()) @db.Uuid
+  clientId    String            @map("client_id") @db.Uuid
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contactType ClientContactType @map("contact_type")
+  value       String
+  isPrimary   Boolean           @default(false) @map("is_primary")
+  comment     String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@index([clientId, contactType])
+  @@index([value])
+  @@map("client_contacts")
+}
+
+model ClientComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId    String?  @map("user_id") @db.Uuid
+  user      User?    @relation("ClientCommentAuthor", fields: [userId], references: [id], onDelete: SetNull)
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, createdAt])
+  @@index([userId])
+  @@map("client_comments")
+}
+
+model ClientFile {
+  id           String   @id @default(uuid()) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedById String?  @map("uploaded_by_id") @db.Uuid
+  uploadedBy   User?    @relation("ClientFileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  originalName String   @map("original_name")
+  storedName   String   @map("stored_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  storagePath  String   @map("storage_path")
+  comment      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, createdAt])
+  @@index([uploadedById])
+  @@map("client_files")
 }
