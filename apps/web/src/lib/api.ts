@@ -217,12 +217,12 @@ export type ClientPayload = {
   }>;
 };
 
-function toQueryString(filters: ClientFilters) {
+function toQueryString(filters: Record<string, string | boolean | undefined>) {
   const params = new URLSearchParams();
 
   Object.entries(filters).forEach(([key, value]) => {
-    if (value) {
-      params.set(key, value);
+    if (value !== undefined && value !== '') {
+      params.set(key, String(value));
     }
   });
 
@@ -313,4 +313,125 @@ export async function uploadClientFile(id: string, file: File, comment: string) 
 
 export async function fetchClientHistory(id: string) {
   return apiRequest<ClientHistoryItem[]>(`/clients/${id}/history`);
+}
+
+export type LeadStatus = 'new' | 'assigned' | 'in_progress' | 'converted' | 'closed';
+
+export type LeadRow = {
+  id: string;
+  source?: string | null;
+  site?: string | null;
+  pageUrl?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  telegram?: string | null;
+  message?: string | null;
+  productInterest?: string | null;
+  city?: string | null;
+  ipAddress?: string | null;
+  status: LeadStatus;
+  responsibleUser?: ClientUserSummary | null;
+  client?: Pick<ClientRow, 'id' | 'name' | 'type' | 'status'> | null;
+  clientId?: string | null;
+  dealId?: string | null;
+  receivedAt: string;
+  firstResponseAt?: string | null;
+  closedAt?: string | null;
+  closeReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
+
+export type LeadDetail = LeadRow;
+
+export type LeadFilters = {
+  search?: string;
+  status?: string;
+  source?: string;
+  city?: string;
+  responsibleUserId?: string;
+  overdue?: boolean;
+};
+
+export type LeadPayload = {
+  source?: string;
+  site?: string;
+  pageUrl?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  telegram?: string;
+  message?: string;
+  productInterest?: string;
+  city?: string;
+  ipAddress?: string;
+  status?: LeadStatus;
+  responsibleUserId?: string;
+};
+
+export type LeadHistoryItem = ClientHistoryItem;
+
+export async function fetchLeads(filters: LeadFilters = {}) {
+  return apiRequest<LeadRow[]>(`/leads${toQueryString(filters)}`);
+}
+
+export async function fetchLead(id: string) {
+  return apiRequest<LeadDetail>(`/leads/${id}`);
+}
+
+export async function createLead(payload: LeadPayload) {
+  return apiRequest<LeadDetail>('/leads', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateLead(id: string, payload: Partial<LeadPayload>) {
+  return apiRequest<LeadDetail>(`/leads/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function assignLead(id: string, responsibleUserId: string) {
+  return apiRequest<LeadDetail>(`/leads/${id}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ responsibleUserId })
+  });
+}
+
+export async function closeLead(id: string, closeReason: string) {
+  return apiRequest<LeadDetail>(`/leads/${id}/close`, {
+    method: 'POST',
+    body: JSON.stringify({ closeReason })
+  });
+}
+
+export async function convertLeadToClient(id: string, clientId?: string) {
+  return apiRequest<LeadDetail>(`/leads/${id}/convert-to-client`, {
+    method: 'POST',
+    body: JSON.stringify(clientId ? { clientId } : {})
+  });
+}
+
+export async function convertLeadToDeal(id: string) {
+  return apiRequest<LeadDetail>(`/leads/${id}/convert-to-deal`, {
+    method: 'POST'
+  });
+}
+
+export async function fetchLeadHistory(id: string) {
+  return apiRequest<LeadHistoryItem[]>(`/leads/${id}/history`);
 }

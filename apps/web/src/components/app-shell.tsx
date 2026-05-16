@@ -9,6 +9,7 @@ import { getStoredUser, type SessionUser } from '../lib/auth';
 const navigation = [
   { href: '/dashboard', label: 'Рабочий стол' },
   { href: '/clients', label: 'Клиенты' },
+  { href: '/leads', label: 'Лиды' },
   { href: '/users', label: 'Сотрудники' }
 ];
 
@@ -32,6 +33,8 @@ export function AppShell({ children }: AppShellProps) {
 
   const pageTitle = pathname.startsWith('/clients')
     ? 'Клиенты'
+    : pathname.startsWith('/leads')
+      ? 'Лиды'
     : pathname === '/users'
       ? 'Сотрудники'
       : 'Рабочий стол';

@@ -467,6 +467,16 @@ th {
   margin: 0;
 }
 
+.form-success,
+.warn-text {
+  color: var(--warn);
+  font-weight: 800;
+}
+
+.form-success {
+  color: var(--good);
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -530,6 +540,12 @@ th {
   padding: 14px;
 }
 
+.side-stack {
+  align-self: start;
+  display: grid;
+  gap: 12px;
+}
+
 .check-row {
   align-items: center;
   display: flex !important;
@@ -538,6 +554,11 @@ th {
 
 .check-row input {
   width: auto;
+}
+
+.filter-check {
+  align-self: end;
+  min-height: 42px;
 }
 
 .empty-linked-panel {
