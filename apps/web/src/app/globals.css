@@ -37,7 +37,9 @@ a {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -137,6 +139,18 @@ input {
   background: var(--surface-muted);
   color: var(--text);
   padding: 10px 12px;
+}
+
+.primary-link-button {
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+  padding: 11px 14px;
+}
+
+.primary-link-button:hover {
+  background: var(--accent-strong);
 }
 
 .app-frame {
@@ -301,6 +315,11 @@ input {
   margin-bottom: 16px;
 }
 
+.table-header div {
+  display: grid;
+  gap: 6px;
+}
+
 .table-header span {
   color: var(--muted);
   font-weight: 700;
@@ -328,6 +347,11 @@ th {
   font-size: 13px;
 }
 
+.table-link {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
 .status {
   display: inline-flex;
   border-radius: 999px;
@@ -346,6 +370,184 @@ th {
   color: var(--warn);
 }
 
+.filter-grid,
+.form-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.filter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.form-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.filter-grid label,
+.form-grid label,
+.side-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.filter-grid input,
+.filter-grid select,
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.side-form input,
+.side-form select,
+.side-form textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  padding: 11px 12px;
+}
+
+.filter-grid textarea,
+.form-grid textarea,
+.side-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.filter-button {
+  align-self: end;
+}
+
+.form-surface {
+  max-width: 980px;
+}
+
+.wide-field {
+  grid-column: span 2;
+}
+
+.entity-form {
+  display: grid;
+  gap: 16px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.client-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 22px;
+}
+
+.client-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 18px;
+}
+
+.client-card-header h2 {
+  margin: 6px 0;
+  font-size: 26px;
+}
+
+.client-card-header p,
+.muted-text {
+  color: var(--muted);
+  margin: 0;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+  padding: 16px 0;
+}
+
+.tab {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 11px;
+}
+
+.tab-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+}
+
+.detail-list {
+  display: grid;
+  gap: 10px;
+}
+
+.detail-row {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 13px;
+}
+
+.detail-row span {
+  overflow-wrap: anywhere;
+}
+
+.detail-row small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.side-form {
+  align-self: start;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.check-row {
+  align-items: center;
+  display: flex !important;
+  gap: 9px !important;
+}
+
+.check-row input {
+  width: auto;
+}
+
+.empty-linked-panel {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 800;
+  padding: 24px;
+}
+
 @media (max-width: 900px) {
   .app-frame {
     grid-template-columns: 1fr;
@@ -356,8 +558,15 @@ th {
   }
 
   .stat-grid,
-  .surface-grid {
+  .surface-grid,
+  .filter-grid,
+  .form-grid,
+  .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .wide-field {
+    grid-column: auto;
   }
 
   .topbar {

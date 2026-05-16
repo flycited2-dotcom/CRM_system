@@ -8,6 +8,7 @@ import { getStoredUser, type SessionUser } from '../lib/auth';
 
 const navigation = [
   { href: '/dashboard', label: 'Рабочий стол' },
+  { href: '/clients', label: 'Клиенты' },
   { href: '/users', label: 'Сотрудники' }
 ];
 
@@ -28,6 +29,12 @@ export function AppShell({ children }: AppShellProps) {
     await logout();
     router.replace('/login');
   }
+
+  const pageTitle = pathname.startsWith('/clients')
+    ? 'Клиенты'
+    : pathname === '/users'
+      ? 'Сотрудники'
+      : 'Рабочий стол';
 
   return (
     <div className="app-frame">
@@ -52,7 +59,7 @@ export function AppShell({ children }: AppShellProps) {
         <header className="topbar">
           <div>
             <span className="eyebrow">Личный контур CRM</span>
-            <h1>{pathname === '/users' ? 'Сотрудники' : 'Рабочий стол'}</h1>
+            <h1>{pageTitle}</h1>
           </div>
           <div className="user-block">
             <div>
