@@ -6,9 +6,10 @@
 
 - Monorepo на npm workspaces.
 - Backend: NestJS, Prisma, PostgreSQL, JWT, RBAC, Swagger.
-- Frontend: Next.js App Router, login, dashboard, экран сотрудников, экран клиентов и карточка клиента.
+- Frontend: Next.js App Router, login, dashboard, экран сотрудников, экран клиентов, карточка клиента, экран лидов и карточка лида.
 - Сущности Stage 0/1: users, roles, permissions, refresh tokens, work sessions, activity logs.
 - Сущности Stage 2: clients, client_contacts, client_comments, client_files.
+- Сущности Stage 3: leads.
 - Seed ролей и стартового owner-пользователя.
 
 ## Требования
@@ -89,6 +90,7 @@ npm.cmd run dev:web
 - API health: `http://localhost:4000/api/health`
 - Swagger: `http://localhost:4000/api/docs`
 - Clients: `http://localhost:3000/clients`
+- Leads: `http://localhost:3000/leads`
 
 ## Модуль клиентов
 
@@ -102,6 +104,21 @@ Stage 2 добавляет полный базовый контур клиент
 
 Файлы клиентов сохраняются API в `CLIENT_UPLOAD_DIR`, по умолчанию `/app/uploads/clients`.
 В production compose для этого подключён named volume `crm_uploads:/app/uploads`.
+
+## Модуль лидов
+
+Stage 3 добавляет внутренний контур обработки лидов:
+
+- ручное создание лидов;
+- статусы `new`, `assigned`, `in_progress`, `converted`, `closed`;
+- назначение ответственного;
+- подсветка лидов без первого ответа более 15 минут;
+- закрытие с причиной;
+- конвертация лида в клиента с переносом телефона, email и Telegram;
+- заготовка API для конвертации в сделку до запуска модуля сделок;
+- история действий через audit log.
+
+Публичные webhooks сайтов и реальные Telegram/email-уведомления не входят в этот этап: сначала стабилизируется внутренний модуль лидов.
 
 ## Проверка
 
