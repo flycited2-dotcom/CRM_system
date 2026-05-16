@@ -6,8 +6,9 @@
 
 - Monorepo на npm workspaces.
 - Backend: NestJS, Prisma, PostgreSQL, JWT, RBAC, Swagger.
-- Frontend: Next.js App Router, login, dashboard, экран сотрудников.
+- Frontend: Next.js App Router, login, dashboard, экран сотрудников, экран клиентов и карточка клиента.
 - Сущности Stage 0/1: users, roles, permissions, refresh tokens, work sessions, activity logs.
+- Сущности Stage 2: clients, client_contacts, client_comments, client_files.
 - Seed ролей и стартового owner-пользователя.
 
 ## Требования
@@ -87,6 +88,20 @@ npm.cmd run dev:web
 - Web: `http://localhost:3000`
 - API health: `http://localhost:4000/api/health`
 - Swagger: `http://localhost:4000/api/docs`
+- Clients: `http://localhost:3000/clients`
+
+## Модуль клиентов
+
+Stage 2 добавляет полный базовый контур клиентов:
+
+- CRUD клиентов с типом, статусом, реквизитами, адресами, городом, источником и ответственным.
+- Контакты клиента: телефон, email, Telegram, MAX, WhatsApp и другое.
+- Комментарии, файлы и история действий в карточке клиента.
+- Поиск и фильтры по списку клиентов.
+- Права `clients.view`, `clients.create`, `clients.update`, `clients.delete`.
+
+Файлы клиентов сохраняются API в `CLIENT_UPLOAD_DIR`, по умолчанию `/app/uploads/clients`.
+В production compose для этого подключён named volume `crm_uploads:/app/uploads`.
 
 ## Проверка
 
