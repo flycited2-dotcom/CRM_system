@@ -16,6 +16,9 @@ async function bootstrap() {
   const trustProxyHops = Number(configService.get<string>('TRUST_PROXY_HOPS') ?? 1);
   app.set('trust proxy', Number.isFinite(trustProxyHops) ? trustProxyHops : 1);
 
+  // Tender feeds arrive as one JSON document; the 100 kB default is too small for them.
+  app.useBodyParser('json', { limit: '5mb' });
+
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: webOrigin

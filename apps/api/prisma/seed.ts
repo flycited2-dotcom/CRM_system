@@ -19,6 +19,10 @@ const permissions = [
   ['leads.delete', 'Удаление лидов'],
   ['leads.assign', 'Назначение лидов'],
   ['leads.convert', 'Конвертация лидов'],
+  ['tenders.view', 'Просмотр тендеров'],
+  ['tenders.create', 'Создание тендеров'],
+  ['tenders.update', 'Редактирование тендеров'],
+  ['tenders.delete', 'Удаление тендеров'],
   ['roles.view', 'Просмотр ролей'],
   ['work_sessions.view', 'Просмотр рабочих сессий'],
   ['audit.view', 'Просмотр журнала действий'],
@@ -87,7 +91,10 @@ async function main() {
       'leads.create',
       'leads.update',
       'leads.assign',
-      'leads.convert'
+      'leads.convert',
+      'tenders.view',
+      'tenders.create',
+      'tenders.update'
     ].includes(permission.code)
   );
 
@@ -115,7 +122,10 @@ async function main() {
       'leads.view',
       'leads.create',
       'leads.update',
-      'leads.convert'
+      'leads.convert',
+      'tenders.view',
+      'tenders.create',
+      'tenders.update'
     ].includes(permission.code)
   );
 

@@ -7,9 +7,11 @@ import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ClientsModule } from './clients/clients.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { LeadsModule } from './leads/leads.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesModule } from './roles/roles.module';
+import { TendersModule } from './tenders/tenders.module';
 import { UsersModule } from './users/users.module';
 import { WorkSessionsModule } from './work-sessions/work-sessions.module';
 
@@ -46,6 +48,8 @@ import { WorkSessionsModule } from './work-sessions/work-sessions.module';
     AuthModule,
     ClientsModule,
     LeadsModule,
+    TendersModule,
+    IntegrationsModule,
     UsersModule,
     RolesModule
   ],
