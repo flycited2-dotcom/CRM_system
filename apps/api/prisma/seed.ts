@@ -139,15 +139,18 @@ async function main() {
   const ownerPassword = process.env.OWNER_PASSWORD ?? 'ChangeMe123!';
   const ownerFullName = process.env.OWNER_FULL_NAME ?? 'CRM Owner';
   const passwordHash = await bcrypt.hash(ownerPassword, 12);
+  // The seed runs on every deploy. Overwriting the password each time would undo
+  // a password change made by the owner, so reset it only when asked explicitly.
+  const resetPassword = process.env.OWNER_PASSWORD_RESET === 'true';
 
   await prisma.user.upsert({
     where: { email: ownerEmail },
     update: {
-      fullName: ownerFullName,
-      passwordHash,
       roleId: ownerRole.id,
       isActive: true,
-      status: 'active'
+      status: 'active',
+      deletedAt: null,
+      ...(resetPassword ? { passwordHash } : {})
     },
     create: {
       fullName: ownerFullName,

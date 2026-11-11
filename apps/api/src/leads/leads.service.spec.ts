@@ -277,6 +277,34 @@ describe('LeadsService', () => {
     );
   });
 
+  it('refuses to convert a lead twice or to convert a closed lead', async () => {
+    const service = new LeadsService(prisma as never, auditService as never);
+
+    prisma.lead.findFirst.mockResolvedValue({ id: 'lead-1', status: 'converted', clientId: 'client-1' });
+    await expect(service.convertToClient('lead-1', {}, manager, context)).rejects.toThrow(
+      'Lead is already converted'
+    );
+
+    prisma.lead.findFirst.mockResolvedValue({ id: 'lead-1', status: 'closed' });
+    await expect(service.convertToClient('lead-1', {}, manager, context)).rejects.toThrow(
+      'Closed lead cannot be converted'
+    );
+
+    expect(prisma.client.create).not.toHaveBeenCalled();
+    expect(prisma.lead.update).not.toHaveBeenCalled();
+    expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  it('refuses to set the converted status through a plain update', async () => {
+    prisma.lead.findFirst.mockResolvedValue({ id: 'lead-1', status: 'assigned' });
+    const service = new LeadsService(prisma as never, auditService as never);
+
+    await expect(
+      service.update('lead-1', { status: 'converted' }, manager, context)
+    ).rejects.toThrow('Use the conversion endpoint to convert a lead');
+    expect(prisma.lead.update).not.toHaveBeenCalled();
+  });
+
   it('keeps deal conversion unavailable until deals stage', async () => {
     const service = new LeadsService(prisma as never, auditService as never);
 

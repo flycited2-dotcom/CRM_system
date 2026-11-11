@@ -26,8 +26,16 @@ import { WorkSessionsModule } from './work-sessions/work-sessions.module';
         const expiresIn = (configService.get<string>('JWT_ACCESS_EXPIRES_IN') ??
           '15m') as StringValue;
 
+        const configuredSecret = configService.get<string>('JWT_ACCESS_SECRET');
+
+        // A missing or short secret in production would let anyone forge tokens,
+        // so refuse to start instead of falling back to a value known from the source.
+        if (process.env.NODE_ENV === 'production' && (!configuredSecret || configuredSecret.length < 32)) {
+          throw new Error('JWT_ACCESS_SECRET must be set to at least 32 characters in production');
+        }
+
         return {
-          secret: configService.get<string>('JWT_ACCESS_SECRET') ?? 'local-access-secret',
+          secret: configuredSecret ?? 'local-access-secret',
           signOptions: { expiresIn }
         };
       }

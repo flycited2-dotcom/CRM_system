@@ -142,6 +142,12 @@ export class LeadsService {
     };
 
     if (dto.status !== undefined) {
+      // "converted" must always come with a linked client, which only the
+      // conversion endpoint guarantees.
+      if (dto.status === LeadStatus.converted) {
+        throw new BadRequestException('Use the conversion endpoint to convert a lead');
+      }
+
       data.status = dto.status;
     }
 
@@ -236,14 +242,24 @@ export class LeadsService {
     context: RequestContext
   ) {
     const lead = await this.findById(id, actor);
+
+    // A second conversion would create a duplicate client for the same lead.
+    if (lead.status === LeadStatus.converted) {
+      throw new BadRequestException('Lead is already converted');
+    }
+
+    if (lead.status === LeadStatus.closed) {
+      throw new BadRequestException('Closed lead cannot be converted');
+    }
+
     const convertedAt = new Date(Date.now());
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const client = dto.clientId
         ? await this.findClientForConversion(tx, dto.clientId, actor)
         : await this.createClientFromLead(tx, lead, actor);
 
-      const updated = await tx.lead.update({
+      return tx.lead.update({
         where: { id },
         data: {
           status: LeadStatus.converted,
@@ -254,21 +270,22 @@ export class LeadsService {
         },
         include: leadInclude
       });
-
-      await this.auditService.log({
-        userId: actor.id,
-        action: 'lead.convert_to_client',
-        entityType: 'lead',
-        entityId: id,
-        newValue: {
-          clientId: client.id
-        },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent
-      });
-
-      return updated;
     });
+
+    // Logged after the commit so a rolled-back conversion leaves no audit record.
+    await this.auditService.log({
+      userId: actor.id,
+      action: 'lead.convert_to_client',
+      entityType: 'lead',
+      entityId: id,
+      newValue: {
+        clientId: updated.clientId
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    });
+
+    return updated;
   }
 
   async convertToDeal() {

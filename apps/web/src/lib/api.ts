@@ -44,7 +44,47 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}) {
+let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * Exchanges the stored refresh token for a new token pair.
+ * Concurrent callers share one request: the API rotates refresh tokens,
+ * so a second parallel refresh with the same token would be rejected.
+ */
+async function refreshSession(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+
+  if (!refreshToken) {
+    return false;
+  }
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await fetch(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+
+        if (!response.ok) {
+          return false;
+        }
+
+        saveSession((await response.json()) as AuthSession);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+
+  return refreshInFlight;
+}
+
+function sendRequest(path: string, init: RequestInit) {
   const token = getAccessToken();
   const headers = new Headers(init.headers);
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
@@ -57,10 +97,26 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...init,
     headers
   });
+}
+
+export async function apiRequest<T>(path: string, init: RequestInit = {}) {
+  let response = await sendRequest(path, init);
+
+  if (response.status === 401 && !path.startsWith('/auth/')) {
+    if (await refreshSession()) {
+      response = await sendRequest(path, init);
+    } else {
+      clearSession();
+
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
+    }
+  }
 
   return parseResponse<T>(response);
 }
@@ -92,7 +148,15 @@ export async function logout() {
 }
 
 export async function fetchMe() {
-  return apiRequest<{ user: SessionUser }>('/auth/me');
+  // Not routed through apiRequest's /auth/ exclusion: an expired access token
+  // here must trigger a refresh instead of dropping the session.
+  let response = await sendRequest('/auth/me', {});
+
+  if (response.status === 401 && (await refreshSession())) {
+    response = await sendRequest('/auth/me', {});
+  }
+
+  return parseResponse<{ user: SessionUser }>(response);
 }
 
 export type UserRow = {
