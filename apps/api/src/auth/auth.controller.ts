@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { LoginThrottleGuard } from '../common/guards/login-throttle.guard';
 import type { AuthenticatedUser } from '../common/types/authenticated-user';
 import type { RequestContext } from '../common/types/request-context';
 import { AuthService } from './auth.service';
@@ -12,6 +13,7 @@ import { LogoutDto, RefreshDto } from './dto/refresh.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @UseGuards(LoginThrottleGuard)
   @Post('login')
   login(@Body() dto: LoginDto, @Req() request: Request) {
     return this.authService.login(dto, this.getRequestContext(request));

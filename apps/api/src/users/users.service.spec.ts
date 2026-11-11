@@ -5,6 +5,7 @@ describe('UsersService', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn()
     },
@@ -58,7 +59,31 @@ describe('UsersService', () => {
     );
   });
 
+  it('refuses to block or delete the acting user', async () => {
+    const service = new UsersService(prisma as never, auditService as never);
+    const context = { ipAddress: '127.0.0.1', userAgent: 'jest' };
+
+    await expect(service.block('owner-1', 'owner-1', context)).rejects.toThrow(
+      'You cannot block your own account'
+    );
+    await expect(service.softDelete('owner-1', 'owner-1', context)).rejects.toThrow(
+      'You cannot delete your own account'
+    );
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('returns not found when blocking a missing user', async () => {
+    prisma.user.findFirst.mockResolvedValue(null);
+    const service = new UsersService(prisma as never, auditService as never);
+
+    await expect(
+      service.block('missing', 'owner-1', { ipAddress: '127.0.0.1', userAgent: 'jest' })
+    ).rejects.toThrow('User not found');
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   it('blocks a user and writes audit', async () => {
+    prisma.user.findFirst.mockResolvedValue({ id: 'user-1', status: 'active' });
     prisma.user.update.mockResolvedValue({
       id: 'user-1',
       status: 'blocked',

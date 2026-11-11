@@ -12,6 +12,8 @@ export class AuditController {
   @Get()
   @Permissions('audit.view')
   list(@Query('limit') limit?: string) {
-    return this.auditService.list(limit ? Number(limit) : 100);
+    const parsed = Number(limit);
+
+    return this.auditService.list(Number.isInteger(parsed) && parsed > 0 ? parsed : 100);
   }
 }

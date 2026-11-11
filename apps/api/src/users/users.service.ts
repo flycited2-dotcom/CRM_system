@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException
@@ -152,6 +153,11 @@ export class UsersService {
   }
 
   async softDelete(id: string, actorId: string, context: RequestContext) {
+    // Deleting or blocking your own account can lock the last administrator out.
+    if (id === actorId) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
     await this.findById(id);
 
     const user = await this.prisma.user.update({
@@ -178,6 +184,12 @@ export class UsersService {
   }
 
   async block(id: string, actorId: string, context: RequestContext) {
+    if (id === actorId) {
+      throw new BadRequestException('You cannot block your own account');
+    }
+
+    await this.findById(id);
+
     const user = await this.prisma.user.update({
       where: { id },
       data: {
@@ -201,6 +213,8 @@ export class UsersService {
   }
 
   async unblock(id: string, actorId: string, context: RequestContext) {
+    await this.findById(id);
+
     const user = await this.prisma.user.update({
       where: { id },
       data: {
