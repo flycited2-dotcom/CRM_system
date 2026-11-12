@@ -376,15 +376,18 @@ export class TendersService {
     }
 
     if (toCreate.length > 0) {
-      await this.prisma.tender.createMany({ data: toCreate });
-      await this.prisma.activityLog.createMany({
-        data: toCreate.map((row) => ({
-          action: 'tender.import',
-          entityType: 'tender',
-          entityId: row.id,
-          newValue: { integration: integration.code, externalKey: row.externalKey }
-        }))
-      });
+      const historyRows: Prisma.ActivityLogCreateManyInput[] = toCreate.map((row) => ({
+        action: 'tender.import',
+        entityType: 'tender',
+        entityId: row.id,
+        newValueJson: { integration: integration.code, externalKey: row.externalKey ?? null }
+      }));
+
+      // One transaction: a tender must never appear without its origin record.
+      await this.prisma.$transaction([
+        this.prisma.tender.createMany({ data: toCreate }),
+        this.prisma.activityLog.createMany({ data: historyRows })
+      ]);
       result.created = toCreate.length;
     }
 

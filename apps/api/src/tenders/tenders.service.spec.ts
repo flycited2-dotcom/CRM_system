@@ -93,7 +93,8 @@ describe('TendersService.importFromIntegration', () => {
     },
     activityLog: {
       createMany: jest.fn()
-    }
+    },
+    $transaction: jest.fn(async (operations: unknown[]) => Promise.all(operations))
   };
   const auditService = { log: jest.fn() };
   const integration = { id: 'integration-1', code: 'tender-parser' };
@@ -132,7 +133,19 @@ describe('TendersService.importFromIntegration', () => {
     // New tenders start in the default "found" status and are not assigned.
     expect(rows[0].status).toBeUndefined();
     expect(rows[0].responsibleUserId).toBeUndefined();
-    expect(prisma.activityLog.createMany.mock.calls[0][0].data).toHaveLength(2);
+    // Tenders and their origin records are written together.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    const history = prisma.activityLog.createMany.mock.calls[0][0].data;
+    expect(history).toHaveLength(2);
+    // Column names of activity_logs: a wrong name here fails only against a real database.
+    expect(Object.keys(history[0]).sort()).toEqual(['action', 'entityId', 'entityType', 'newValueJson']);
+    expect(history[0]).toMatchObject({
+      action: 'tender.import',
+      entityType: 'tender',
+      entityId: rows[0].id,
+      newValueJson: { integration: 'tender-parser', externalKey: 'eis-zakupki:1' }
+    });
   });
 
   it('refreshes an existing tender without touching what people set in the CRM', async () => {
