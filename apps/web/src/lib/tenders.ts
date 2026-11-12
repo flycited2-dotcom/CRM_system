@@ -14,7 +14,9 @@ export const tenderStatusLabels: Record<TenderStatus, string> = {
   delivery: 'Поставка',
   closing: 'Закрытие документов',
   lost: 'Проигрыш',
-  declined: 'Отказ от участия'
+  declined: 'Отказ от участия',
+  not_held: 'Не состоялся',
+  missed: 'Опоздали'
 };
 
 export const tenderPriorityLabels: Record<TenderPriority, string> = {
@@ -23,7 +25,7 @@ export const tenderPriorityLabels: Record<TenderPriority, string> = {
   wide: 'Широкий поиск'
 };
 
-const FINISHED: TenderStatus[] = ['closing', 'lost', 'declined'];
+const FINISHED: TenderStatus[] = ['closing', 'lost', 'declined', 'not_held', 'missed'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function formatMoney(value?: string | number | null) {
@@ -81,7 +83,7 @@ export function tenderStatusClass(status: TenderStatus) {
     return 'status status-good';
   }
 
-  if (['lost', 'declined'].includes(status)) {
+  if (['lost', 'declined', 'not_held', 'missed'].includes(status)) {
     return 'status status-warn';
   }
 

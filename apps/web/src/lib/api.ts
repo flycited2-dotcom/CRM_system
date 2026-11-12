@@ -513,7 +513,9 @@ export type TenderStatus =
   | 'delivery'
   | 'closing'
   | 'lost'
-  | 'declined';
+  | 'declined'
+  | 'not_held'
+  | 'missed';
 
 export type TenderPriority = 'hot' | 'review' | 'wide';
 
@@ -531,9 +533,11 @@ export type TenderRow = {
   submissionDeadline?: string | null;
   auctionDate?: string | null;
   procurementLaw?: string | null;
+  procedureType?: string | null;
   category?: string | null;
   priority?: TenderPriority | null;
   status: TenderStatus;
+  takenAt?: string | null;
   responsibleUserId?: string | null;
   responsibleUser?: ClientUserSummary | null;
   requirements?: string | null;
@@ -644,6 +648,7 @@ export type IntegrationType =
   | 'telegram'
   | 'email'
   | 'tender_parser'
+  | 'tender_tracker'
   | 'parser'
   | 'agent'
   | 'onec'

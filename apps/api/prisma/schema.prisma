@@ -54,6 +54,8 @@ enum IntegrationType {
   telegram
   email
   tender_parser
+  // The "taken into work" journal (browser plugin + its Google Sheet): may set work status.
+  tender_tracker
   parser
   agent
   onec
@@ -80,6 +82,10 @@ enum TenderStatus {
   closing
   lost
   declined
+  // The procurement was cancelled or got no bids.
+  not_held
+  // We did not submit in time.
+  missed
 }
 
 model User {
@@ -338,6 +344,8 @@ model Tender {
   submissionDeadline DateTime?    @map("submission_deadline")
   auctionDate        DateTime?    @map("auction_date")
   procurementLaw     String?      @map("procurement_law")
+  // Auction, request for quotations, ... as the procurement notice names it.
+  procedureType      String?      @map("procedure_type")
   category           String?
   // Parser's relevance bucket: hot / review / wide.
   priority           String?
@@ -348,6 +356,11 @@ model Tender {
   result             String?
   margin             Decimal?     @db.Decimal(18, 2)
   comment            String?
+  // When the team decided to work on the tender.
+  takenAt            DateTime?    @map("taken_at")
+  // Work fields as the work journal last sent them: tells a change made in the
+  // journal from one made in the CRM.
+  journalJson        Json?        @map("journal_json")
   source             String?
   integrationId      String?      @map("integration_id") @db.Uuid
   integration        Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
