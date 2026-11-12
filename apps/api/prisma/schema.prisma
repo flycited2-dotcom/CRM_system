@@ -46,6 +46,42 @@ enum LeadStatus {
   closed
 }
 
+enum IntegrationType {
+  site
+  app
+  avito
+  vk
+  telegram
+  email
+  tender_parser
+  parser
+  agent
+  onec
+  other
+}
+
+enum IntegrationStatus {
+  active
+  disabled
+}
+
+// Tender funnel from the product spec: found -> ... -> closing, with two exits.
+enum TenderStatus {
+  found
+  analysis
+  product_check
+  pricing
+  documents
+  submitted
+  awaiting_result
+  won
+  contract
+  delivery
+  closing
+  lost
+  declined
+}
+
 model User {
   id             String         @id @default(uuid()) @db.Uuid
   fullName       String         @map("full_name")
@@ -69,6 +105,7 @@ model User {
   activityLogs   ActivityLog[]
   assignedClients Client[]       @relation("ClientResponsible")
   assignedLeads   Lead[]         @relation("LeadResponsible")
+  assignedTenders Tender[]       @relation("TenderResponsible")
   clientComments ClientComment[] @relation("ClientCommentAuthor")
   clientFiles    ClientFile[]    @relation("ClientFileUploader")
 
@@ -215,6 +252,13 @@ model Lead {
   clientId          String?    @map("client_id") @db.Uuid
   client            Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
   dealId            String?    @map("deal_id") @db.Uuid
+  // Set when the lead arrived through the intake API. externalId is the id the
+  // source system gave the request: a repeated delivery must not create a second lead.
+  integrationId     String?    @map("integration_id") @db.Uuid
+  integration       Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  externalId        String?    @map("external_id")
+  // Earlier lead with the same phone or email, if one was found on arrival.
+  duplicateOfId     String?    @map("duplicate_of_id") @db.Uuid
   receivedAt        DateTime   @default(now()) @map("received_at")
   firstResponseAt   DateTime?  @map("first_response_at")
   closedAt          DateTime?  @map("closed_at")
@@ -225,6 +269,7 @@ model Lead {
   createdBy         String?    @map("created_by") @db.Uuid
   updatedBy         String?    @map("updated_by") @db.Uuid
 
+  @@unique([integrationId, externalId])
   @@index([status])
   @@index([responsibleUserId])
   @@index([clientId])
@@ -232,7 +277,104 @@ model Lead {
   @@index([deletedAt])
   @@index([source])
   @@index([city])
+  @@index([phone])
+  @@index([email])
   @@map("leads")
+}
+
+// An external system allowed to push data into the CRM: a site form, the tender
+// parser, a bot. Each one has its own key, so access can be revoked per system.
+model Integration {
+  id          String            @id @default(uuid()) @db.Uuid
+  type        IntegrationType
+  name        String
+  // Stable short name written into lead.source / tender.source.
+  code        String            @unique
+  status      IntegrationStatus @default(active)
+  // Only the SHA-256 of the key is stored; the key itself is shown once on creation.
+  keyHash     String            @unique @map("key_hash")
+  keyPrefix   String            @map("key_prefix")
+  description String?
+  lastSyncAt  DateTime?         @map("last_sync_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  deletedAt   DateTime?         @map("deleted_at")
+  createdBy   String?           @map("created_by") @db.Uuid
+  updatedBy   String?           @map("updated_by") @db.Uuid
+  logs        IntegrationLog[]
+  leads       Lead[]
+  tenders     Tender[]
+
+  @@index([status])
+  @@map("integrations")
+}
+
+model IntegrationLog {
+  id            String      @id @default(uuid()) @db.Uuid
+  integrationId String      @map("integration_id") @db.Uuid
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  direction     String      @default("incoming")
+  operation     String
+  status        String
+  requestJson   Json?       @map("request_json")
+  responseJson  Json?       @map("response_json")
+  errorMessage  String?     @map("error_message")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([integrationId, createdAt])
+  @@map("integration_logs")
+}
+
+model Tender {
+  id                 String       @id @default(uuid()) @db.Uuid
+  title              String
+  tenderNumber       String?      @map("tender_number")
+  platform           String?
+  url                String?
+  customerName       String?      @map("customer_name")
+  region             String?
+  nmck               Decimal?     @db.Decimal(18, 2)
+  publishDate        DateTime?    @map("publish_date")
+  submissionDeadline DateTime?    @map("submission_deadline")
+  auctionDate        DateTime?    @map("auction_date")
+  procurementLaw     String?      @map("procurement_law")
+  category           String?
+  // Parser's relevance bucket: hot / review / wide.
+  priority           String?
+  status             TenderStatus @default(found)
+  responsibleUserId  String?      @map("responsible_user_id") @db.Uuid
+  responsibleUser    User?        @relation("TenderResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  requirements       String?
+  result             String?
+  margin             Decimal?     @db.Decimal(18, 2)
+  comment            String?
+  source             String?
+  integrationId      String?      @map("integration_id") @db.Uuid
+  integration        Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  // "<source>:<number>" as the source system identifies the tender; the key the
+  // intake API upserts on.
+  externalKey        String?      @unique @map("external_key")
+  // Number in the original procurement system, when an aggregator card was resolved.
+  officialNumber     String?      @map("official_number")
+  officialUrl        String?      @map("official_url")
+  documentsUrl       String?      @map("documents_url")
+  // Source-specific fields kept as received (match reasons, confidence, ...).
+  payloadJson        Json?        @map("payload_json")
+  firstSeenAt        DateTime     @default(now()) @map("first_seen_at")
+  lastSeenAt         DateTime     @default(now()) @map("last_seen_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  deletedAt          DateTime?    @map("deleted_at")
+  createdBy          String?      @map("created_by") @db.Uuid
+  updatedBy          String?      @map("updated_by") @db.Uuid
+
+  @@index([status])
+  @@index([submissionDeadline])
+  @@index([responsibleUserId])
+  @@index([deletedAt])
+  @@index([officialNumber])
+  @@index([priority])
+  @@map("tenders")
 }
 
 model ClientContact {

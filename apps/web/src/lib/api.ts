@@ -499,3 +499,212 @@ export async function convertLeadToDeal(id: string) {
 export async function fetchLeadHistory(id: string) {
   return apiRequest<LeadHistoryItem[]>(`/leads/${id}/history`);
 }
+
+export type TenderStatus =
+  | 'found'
+  | 'analysis'
+  | 'product_check'
+  | 'pricing'
+  | 'documents'
+  | 'submitted'
+  | 'awaiting_result'
+  | 'won'
+  | 'contract'
+  | 'delivery'
+  | 'closing'
+  | 'lost'
+  | 'declined';
+
+export type TenderPriority = 'hot' | 'review' | 'wide';
+
+export type TenderRow = {
+  id: string;
+  title: string;
+  tenderNumber?: string | null;
+  platform?: string | null;
+  url?: string | null;
+  customerName?: string | null;
+  region?: string | null;
+  // Decimal columns arrive as strings.
+  nmck?: string | null;
+  publishDate?: string | null;
+  submissionDeadline?: string | null;
+  auctionDate?: string | null;
+  procurementLaw?: string | null;
+  category?: string | null;
+  priority?: TenderPriority | null;
+  status: TenderStatus;
+  responsibleUserId?: string | null;
+  responsibleUser?: ClientUserSummary | null;
+  requirements?: string | null;
+  result?: string | null;
+  margin?: string | null;
+  comment?: string | null;
+  source?: string | null;
+  officialNumber?: string | null;
+  officialUrl?: string | null;
+  documentsUrl?: string | null;
+  payloadJson?: {
+    sourceUrl?: string | null;
+    sourceStatus?: string | null;
+    matchConfidence?: string | null;
+    includeReason?: string | null;
+    matchedTerms?: string[];
+    deliveryRegionEvidence?: string | null;
+  } | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TenderFilters = {
+  search?: string;
+  status?: string;
+  priority?: string;
+  responsibleUserId?: string;
+  deadline?: string;
+  onlyActual?: boolean;
+  take?: string;
+};
+
+export type TenderPayload = {
+  title: string;
+  tenderNumber?: string;
+  platform?: string;
+  url?: string;
+  customerName?: string;
+  region?: string;
+  nmck?: number;
+  publishDate?: string;
+  submissionDeadline?: string;
+  auctionDate?: string;
+  procurementLaw?: string;
+  category?: string;
+  // null clears the assignment.
+  responsibleUserId?: string | null;
+  requirements?: string;
+  comment?: string;
+  result?: string;
+  margin?: number;
+};
+
+export type TenderSummary = {
+  active: number;
+  hot: number;
+  closingSoon: number;
+  unassigned: number;
+  inWork: number;
+};
+
+export type TenderHistoryItem = ClientHistoryItem;
+
+export async function fetchTenders(filters: TenderFilters = {}) {
+  return apiRequest<{ items: TenderRow[]; total: number }>(`/tenders${toQueryString(filters)}`);
+}
+
+export async function fetchTenderSummary() {
+  return apiRequest<TenderSummary>('/tenders/summary');
+}
+
+export async function fetchTender(id: string) {
+  return apiRequest<TenderRow>(`/tenders/${id}`);
+}
+
+export async function createTender(payload: TenderPayload) {
+  return apiRequest<TenderRow>('/tenders', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateTender(id: string, payload: Partial<TenderPayload>) {
+  return apiRequest<TenderRow>(`/tenders/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function changeTenderStatus(id: string, status: TenderStatus, result?: string) {
+  return apiRequest<TenderRow>(`/tenders/${id}/change-status`, {
+    method: 'POST',
+    body: JSON.stringify({ status, result })
+  });
+}
+
+export async function fetchTenderHistory(id: string) {
+  return apiRequest<TenderHistoryItem[]>(`/tenders/${id}/history`);
+}
+
+export type IntegrationType =
+  | 'site'
+  | 'app'
+  | 'avito'
+  | 'vk'
+  | 'telegram'
+  | 'email'
+  | 'tender_parser'
+  | 'parser'
+  | 'agent'
+  | 'onec'
+  | 'other';
+
+export type IntegrationRow = {
+  id: string;
+  type: IntegrationType;
+  name: string;
+  code: string;
+  status: 'active' | 'disabled';
+  keyPrefix: string;
+  description?: string | null;
+  lastSyncAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// Returned only by create and rotate-key: the key is never readable again.
+export type IntegrationWithKey = IntegrationRow & { key: string };
+
+export type IntegrationLogRow = {
+  id: string;
+  operation: string;
+  status: string;
+  requestJson?: unknown;
+  responseJson?: unknown;
+  errorMessage?: string | null;
+  createdAt: string;
+};
+
+export async function fetchIntegrations() {
+  return apiRequest<IntegrationRow[]>('/integrations');
+}
+
+export async function createIntegration(payload: {
+  type: IntegrationType;
+  name: string;
+  code: string;
+  description?: string;
+}) {
+  return apiRequest<IntegrationWithKey>('/integrations', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateIntegration(
+  id: string,
+  payload: { name?: string; description?: string; status?: 'active' | 'disabled' }
+) {
+  return apiRequest<IntegrationRow>(`/integrations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function rotateIntegrationKey(id: string) {
+  return apiRequest<IntegrationWithKey>(`/integrations/${id}/rotate-key`, { method: 'POST' });
+}
+
+export async function fetchIntegrationLogs(id: string) {
+  return apiRequest<IntegrationLogRow[]>(`/integrations/${id}/logs?limit=30`);
+}

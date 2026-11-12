@@ -1,15 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../components/app-shell';
 import { StatCard } from '../../components/stat-card';
-import { fetchMe } from '../../lib/api';
+import { fetchMe, fetchTenderSummary, type TenderSummary } from '../../lib/api';
 import { clearSession, type SessionUser } from '../../lib/auth';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [tenders, setTenders] = useState<TenderSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,6 +22,10 @@ export default function DashboardPage() {
         setError('Сессия недействительна');
         router.replace('/login');
       });
+    // Not every role may see tenders: the block is simply hidden for those who cannot.
+    fetchTenderSummary()
+      .then(setTenders)
+      .catch(() => setTenders(null));
   }, [router]);
 
   return (
@@ -31,23 +37,34 @@ export default function DashboardPage() {
           <StatCard label="Доступов" value={String(user?.permissions.length ?? 0)} />
           <StatCard label="Статус API" value={error ?? 'Доступен'} tone={error ? 'warn' : 'good'} />
         </div>
-        <section className="work-surface">
-          <h2>Операционный старт</h2>
-          <div className="surface-grid">
-            <div>
-              <span className="surface-label">Auth</span>
-              <strong>JWT, refresh token, logout</strong>
+
+        {tenders ? (
+          <section className="work-surface">
+            <div className="table-header">
+              <div>
+                <h2>Тендеры</h2>
+                <span>Что требует внимания сейчас</span>
+              </div>
+              <Link className="primary-link-button" href="/tenders">
+                Открыть тендеры
+              </Link>
             </div>
-            <div>
-              <span className="surface-label">RBAC</span>
-              <strong>Роли и permissions</strong>
+            <div className="stat-grid">
+              <StatCard label="Актуальные" value={String(tenders.active)} />
+              <StatCard
+                label="Срок подачи до 3 дней"
+                value={String(tenders.closingSoon)}
+                tone={tenders.closingSoon > 0 ? 'warn' : 'neutral'}
+              />
+              <StatCard
+                label="Без ответственного"
+                value={String(tenders.unassigned)}
+                tone={tenders.unassigned > 0 ? 'warn' : 'neutral'}
+              />
+              <StatCard label="В работе" value={String(tenders.inWork)} tone="good" />
             </div>
-            <div>
-              <span className="surface-label">Контроль</span>
-              <strong>Рабочие сессии и audit log</strong>
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
       </div>
     </AppShell>
   );
