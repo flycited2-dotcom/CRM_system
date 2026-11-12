@@ -24,6 +24,7 @@ const typeLabels: Record<IntegrationType, string> = {
   telegram: 'Telegram',
   email: 'Почта',
   tender_parser: 'Парсер тендеров',
+  tender_tracker: 'Учёт заявок по тендерам',
   parser: 'Парсер',
   agent: 'Агент',
   onec: '1С',

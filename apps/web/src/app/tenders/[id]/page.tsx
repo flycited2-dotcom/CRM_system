@@ -178,7 +178,7 @@ export default function TenderPage() {
                 <span className="eyebrow">{tenderStatusLabels[tender.status]}</span>
                 <h2>{tender.title}</h2>
                 <p>
-                  {[tender.tenderNumber, tender.platform, tender.procurementLaw]
+                  {[tender.tenderNumber, tender.platform, tender.procurementLaw, tender.procedureType]
                     .filter(Boolean)
                     .join(' · ') || 'Номер не указан'}
                 </p>
@@ -221,6 +221,7 @@ export default function TenderPage() {
                   <span>Опубликован: {formatDateTime(tender.publishDate)}</span>
                   <span>Окончание подачи: {formatDateTime(tender.submissionDeadline)}</span>
                   <span>Аукцион: {formatDateTime(tender.auctionDate)}</span>
+                  {tender.takenAt ? <span>Взяли в работу: {formatDateTime(tender.takenAt)}</span> : null}
                 </div>
                 <div className="detail-row">
                   <strong>Категория и приоритет</strong>

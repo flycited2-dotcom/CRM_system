@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Integration, Prisma, TenderStatus } from '@prisma/client';
+import { Integration, IntegrationType, Prisma, TenderStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../common/types/authenticated-user';
@@ -9,7 +9,13 @@ import type { ChangeTenderStatusDto } from './dto/change-tender-status.dto';
 import type { CreateTenderDto } from './dto/create-tender.dto';
 import type { TenderQueryDto } from './dto/tender-query.dto';
 import type { UpdateTenderDto } from './dto/update-tender.dto';
-import { definedFields, parseImportedTender, type ImportedTender } from './tender-import';
+import {
+  definedFields,
+  looksLikeOfficialNumber,
+  parseImportedTender,
+  type ImportedTender,
+  type ImportedTenderWork
+} from './tender-import';
 
 const SOON_MS = 3 * 24 * 60 * 60 * 1000;
 const DEFAULT_PAGE_SIZE = 100;
@@ -18,8 +24,77 @@ const DEFAULT_PAGE_SIZE = 100;
 const FINISHED_STATUSES: TenderStatus[] = [
   TenderStatus.closing,
   TenderStatus.lost,
-  TenderStatus.declined
+  TenderStatus.declined,
+  TenderStatus.not_held,
+  TenderStatus.missed
 ];
+
+// A work journal matches tenders by number alone; shorter numbers are too likely
+// to coincide between trading platforms.
+const MIN_JOURNAL_NUMBER_LENGTH = 6;
+
+// What an import needs to know about a tender that is already stored.
+const importMatchSelect = {
+  id: true,
+  externalKey: true,
+  deletedAt: true,
+  integrationId: true,
+  status: true,
+  comment: true,
+  takenAt: true,
+  journalJson: true,
+  title: true,
+  tenderNumber: true,
+  platform: true,
+  url: true,
+  customerName: true,
+  region: true,
+  nmck: true,
+  publishDate: true,
+  submissionDeadline: true,
+  auctionDate: true,
+  procurementLaw: true,
+  procedureType: true,
+  category: true,
+  priority: true,
+  officialNumber: true,
+  officialUrl: true,
+  documentsUrl: true
+} satisfies Prisma.TenderSelect;
+
+type StoredTender = Prisma.TenderGetPayload<{ select: typeof importMatchSelect }>;
+type ImportEntry = { tender: ImportedTender; work: ImportedTenderWork; sourceNumber?: string };
+
+function isBlank(value: unknown) {
+  return value === null || value === undefined || value === '';
+}
+
+function sameValue(incoming: unknown, stored: unknown) {
+  if (incoming instanceof Date) {
+    return stored instanceof Date && stored.getTime() === incoming.getTime();
+  }
+
+  if (typeof incoming === 'number') {
+    // Decimal columns come back as Prisma.Decimal.
+    return !isBlank(stored) && Number(stored) === incoming;
+  }
+
+  return incoming === stored;
+}
+
+function definedOnly(value: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+}
+
+/** The work fields exactly as a journal sent them, in a form that can be stored and compared. */
+function journalSnapshot(work: ImportedTenderWork): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(definedOnly(work)).map(([key, value]) => [
+      key,
+      value instanceof Date ? value.toISOString() : String(value)
+    ])
+  );
+}
 
 const tenderInclude = {
   responsibleUser: {
@@ -214,6 +289,12 @@ export class TendersService {
       data: {
         status: dto.status,
         result: dto.result,
+        // The first move out of "found" is the moment the tender was taken into work.
+        ...(current.status === TenderStatus.found &&
+        dto.status !== TenderStatus.found &&
+        !current.takenAt
+          ? { takenAt: new Date() }
+          : {}),
         updatedBy: actor.id
       },
       include: tenderInclude
@@ -279,6 +360,9 @@ export class TendersService {
    * in the "found" status. Existing ones get their source-owned fields refreshed;
    * everything people set in the CRM (status, responsible, comment, margin) is
    * left untouched. A tender deleted in the CRM stays deleted.
+   *
+   * An integration of the `tender_tracker` type is a work journal: its entries
+   * also carry the status, comment and dates the team set (see applyJournalEntry).
    */
   async importFromIntegration(
     integration: Integration,
@@ -286,55 +370,106 @@ export class TendersService {
     defaultOffset: string
   ): Promise<TenderImportResult> {
     const result: TenderImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
-    const parsed = new Map<string, ImportedTender>();
+    // A work journal reports what the team decided; any other feed only describes tenders.
+    const managesWork = integration.type === IntegrationType.tender_tracker;
+    const parsed = new Map<string, ImportEntry>();
 
     items.forEach((item, index) => {
       const outcome = parseImportedTender(item, defaultOffset);
 
-      if (outcome.ok) {
-        // The same tender twice in one feed: the later entry wins.
-        parsed.set(outcome.tender.externalKey, outcome.tender);
-      } else {
+      if (!outcome.ok) {
         result.errors.push({ index, message: outcome.message });
+        return;
       }
+
+      const { tender, work, sourceNumber } = outcome;
+
+      // The journal knows one number per tender. Marking a registry number as such
+      // lets the finder feed recognise the same procurement later.
+      if (managesWork && !tender.officialNumber && looksLikeOfficialNumber(sourceNumber)) {
+        tender.officialNumber = sourceNumber;
+      }
+
+      // A finder feed is named after the platform it reads; a journal is not a platform.
+      if (managesWork && tender.platform === tender.payloadJson.source) {
+        tender.platform = undefined;
+      }
+
+      // The same tender twice in one feed: the later entry wins.
+      parsed.set(tender.externalKey, { tender, work, sourceNumber });
     });
 
     if (parsed.size === 0) {
       return result;
     }
 
-    const tenders = [...parsed.values()];
-    const officialNumbers = tenders
-      .map((tender) => tender.officialNumber)
+    const entries = [...parsed.values()];
+    const journalNumberOf = (entry: ImportEntry) =>
+      managesWork &&
+      entry.sourceNumber &&
+      entry.sourceNumber.length >= MIN_JOURNAL_NUMBER_LENGTH
+        ? entry.sourceNumber
+        : undefined;
+    const officialNumbers = entries
+      .map((entry) => entry.tender.officialNumber)
+      .filter((value): value is string => Boolean(value));
+    const journalNumbers = entries
+      .map(journalNumberOf)
       .filter((value): value is string => Boolean(value));
     const existing = await this.prisma.tender.findMany({
       where: {
         OR: [
-          { externalKey: { in: tenders.map((tender) => tender.externalKey) } },
-          ...(officialNumbers.length > 0 ? [{ officialNumber: { in: officialNumbers } }] : [])
+          { externalKey: { in: entries.map((entry) => entry.tender.externalKey) } },
+          ...(officialNumbers.length > 0 ? [{ officialNumber: { in: officialNumbers } }] : []),
+          // The journal's number may be the registry number or the platform's own.
+          ...(journalNumbers.length > 0
+            ? [
+                { officialNumber: { in: journalNumbers } },
+                { tenderNumber: { in: journalNumbers } }
+              ]
+            : [])
         ]
       },
-      select: { id: true, externalKey: true, officialNumber: true, deletedAt: true }
+      select: importMatchSelect
     });
     const byKey = new Map(existing.map((row) => [row.externalKey, row]));
     const byOfficialNumber = new Map(
       existing.filter((row) => row.officialNumber).map((row) => [row.officialNumber, row])
     );
+    const byTenderNumber = new Map(
+      existing.filter((row) => row.tenderNumber).map((row) => [row.tenderNumber, row])
+    );
 
     const now = new Date();
     const toCreate: Prisma.TenderCreateManyInput[] = [];
+    const historyRows: Prisma.ActivityLogCreateManyInput[] = [];
+    // Official numbers of the tenders being created from this same feed.
+    const createdInFeed = new Set<string>();
 
-    for (const tender of tenders) {
+    for (const entry of entries) {
+      const { tender, work } = entry;
+      const journalNumber = journalNumberOf(entry);
       const match =
         byKey.get(tender.externalKey) ??
-        (tender.officialNumber ? byOfficialNumber.get(tender.officialNumber) : undefined);
+        (tender.officialNumber ? byOfficialNumber.get(tender.officialNumber) : undefined) ??
+        (journalNumber
+          ? (byOfficialNumber.get(journalNumber) ?? byTenderNumber.get(journalNumber))
+          : undefined);
 
       if (!match) {
+        // A second aggregator card of the same tender later in this feed must
+        // not create another tender.
+        if (tender.officialNumber && createdInFeed.has(tender.officialNumber)) {
+          result.skipped += 1;
+          continue;
+        }
+
         const id = randomUUID();
 
         toCreate.push({
           id,
           ...(definedFields(tender) as Omit<Prisma.TenderCreateManyInput, 'title'>),
+          ...(managesWork ? { ...definedOnly(work), journalJson: journalSnapshot(work) } : {}),
           title: tender.title,
           externalKey: tender.externalKey,
           source: integration.code,
@@ -342,16 +477,19 @@ export class TendersService {
           firstSeenAt: now,
           lastSeenAt: now
         });
-
-        // A second aggregator card of the same tender later in this feed must
-        // match the one being created, not create another.
-        if (tender.officialNumber) {
-          byOfficialNumber.set(tender.officialNumber, {
-            id,
+        historyRows.push({
+          action: 'tender.import',
+          entityType: 'tender',
+          entityId: id,
+          newValueJson: {
+            integration: integration.code,
             externalKey: tender.externalKey,
-            officialNumber: tender.officialNumber,
-            deletedAt: null
-          });
+            ...(managesWork && work.status ? { status: work.status } : {})
+          }
+        });
+
+        if (tender.officialNumber) {
+          createdInFeed.add(tender.officialNumber);
         }
 
         continue;
@@ -362,9 +500,8 @@ export class TendersService {
         continue;
       }
 
-      // Created earlier in this same feed: nothing to refresh yet.
-      if (toCreate.some((row) => row.id === match.id)) {
-        result.skipped += 1;
+      if (managesWork) {
+        result[await this.applyJournalEntry(integration, match, tender, work, now)] += 1;
         continue;
       }
 
@@ -376,13 +513,6 @@ export class TendersService {
     }
 
     if (toCreate.length > 0) {
-      const historyRows: Prisma.ActivityLogCreateManyInput[] = toCreate.map((row) => ({
-        action: 'tender.import',
-        entityType: 'tender',
-        entityId: row.id,
-        newValueJson: { integration: integration.code, externalKey: row.externalKey ?? null }
-      }));
-
       // One transaction: a tender must never appear without its origin record.
       await this.prisma.$transaction([
         this.prisma.tender.createMany({ data: toCreate }),
@@ -392,6 +522,89 @@ export class TendersService {
     }
 
     return result;
+  }
+
+  /**
+   * Applies a work-journal entry to a stored tender.
+   *
+   * The journal reports the work fields (status, comment, date taken, auction
+   * date); each is applied when the journal changed it since its previous
+   * delivery, so an edit made in the CRM survives until then. The descriptive
+   * fields are refreshed only for tenders the journal created itself; for a
+   * tender that came from a finder feed it fills the blanks and leaves the rest
+   * to that feed. Nothing is written when nothing changed, so resending the whole
+   * journal on a schedule does not touch the tenders.
+   */
+  private async applyJournalEntry(
+    integration: Integration,
+    match: StoredTender,
+    tender: ImportedTender,
+    work: ImportedTenderWork,
+    now: Date
+  ): Promise<'updated' | 'skipped'> {
+    const stored = match as Record<string, unknown>;
+    const ownsTender = match.integrationId === integration.id;
+    const { payloadJson, ...described } = definedFields(tender);
+    const sent = journalSnapshot(work);
+    const lastSent = (match.journalJson ?? {}) as Record<string, unknown>;
+    const candidate: Record<string, unknown> = {};
+
+    // A work field is applied only when the journal itself changed it since the
+    // previous delivery. Otherwise what was set in the CRM meanwhile would be
+    // undone by every resend.
+    for (const [key, value] of Object.entries(definedOnly(work))) {
+      if (sent[key] !== lastSent[key]) {
+        candidate[key] = value;
+      }
+    }
+
+    for (const [key, value] of Object.entries(described)) {
+      // The auction date is a work field here: the description must not bring it back.
+      if (!(key in sent) && (ownsTender || isBlank(stored[key]))) {
+        candidate[key] = value;
+      }
+    }
+
+    const changes = Object.fromEntries(
+      Object.entries(candidate).filter(([key, value]) => !sameValue(value, stored[key]))
+    );
+    const journalChanged = Object.keys({ ...sent, ...lastSent }).some(
+      (key) => sent[key] !== lastSent[key]
+    );
+
+    if (Object.keys(changes).length === 0 && !journalChanged) {
+      return 'skipped';
+    }
+
+    const update = this.prisma.tender.update({
+      where: { id: match.id },
+      data: {
+        ...changes,
+        journalJson: sent,
+        ...(ownsTender ? { payloadJson: payloadJson as Prisma.InputJsonObject, lastSeenAt: now } : {})
+      }
+    });
+
+    if (!('status' in changes)) {
+      await update;
+      return 'updated';
+    }
+
+    // One transaction: a status must never change without a history record.
+    await this.prisma.$transaction([
+      update,
+      this.prisma.activityLog.create({
+        data: {
+          action: 'tender.status',
+          entityType: 'tender',
+          entityId: match.id,
+          oldValueJson: { status: match.status },
+          newValueJson: { status: work.status, integration: integration.code }
+        }
+      })
+    ]);
+
+    return 'updated';
   }
 
   private toTenderData(dto: CreateTenderDto | UpdateTenderDto) {

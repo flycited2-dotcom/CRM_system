@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { TenderStatus, type Prisma } from '@prisma/client';
 import { amount, dateTime, isRecord, pickText, text } from '../integrations/normalize';
 
 /** Fields a source system owns: refreshed on every import, never edited by hand in the CRM. */
@@ -15,6 +15,7 @@ export type ImportedTender = {
   submissionDeadline?: Date;
   auctionDate?: Date;
   procurementLaw?: string;
+  procedureType?: string;
   category?: string;
   priority?: string;
   officialNumber?: string;
@@ -23,11 +24,31 @@ export type ImportedTender = {
   payloadJson: Prisma.InputJsonObject;
 };
 
+/**
+ * What the team decided about a tender. Sent only by a work journal (the tender
+ * tracker); a feed that merely finds tenders must never change these.
+ */
+export type ImportedTenderWork = {
+  status?: TenderStatus;
+  comment?: string;
+  takenAt?: Date;
+  auctionDate?: Date;
+};
+
 export type ImportParseResult =
-  | { ok: true; tender: ImportedTender }
+  | { ok: true; tender: ImportedTender; work: ImportedTenderWork; sourceNumber?: string }
   | { ok: false; message: string };
 
 const PRIORITIES = new Set(['hot', 'review', 'wide']);
+const STATUSES = new Set<string>(Object.values(TenderStatus));
+
+// Registry numbers of the unified procurement system: 19 digits (44-FZ; 18 in
+// older notices) or 11 digits (223-FZ). Shorter numbers belong to a trading platform.
+const OFFICIAL_NUMBER = /^(\d{11}|\d{18,19})$/;
+
+export function looksLikeOfficialNumber(value?: string) {
+  return Boolean(value && OFFICIAL_NUMBER.test(value));
+}
 
 /**
  * Maps one item of a tender feed to CRM fields.
@@ -49,7 +70,12 @@ export function parseImportedTender(raw: unknown, defaultOffset: string): Import
   const source = pickText(raw, ['source'], 100);
   const sourceNumber = pickText(raw, ['tender_number', 'tenderNumber', 'number'], 200);
   const sourceUrl = pickText(raw, ['url'], 2000);
-  const identity = sourceNumber ?? sourceUrl?.split('#', 1)[0].replace(/\/+$/, '');
+  // A system that keeps its own record id sends it: the number of a tender may be
+  // filled in or corrected later, the record stays the same.
+  const identity =
+    pickText(raw, ['external_id', 'externalId'], 200) ??
+    sourceNumber ??
+    sourceUrl?.split('#', 1)[0].replace(/\/+$/, '');
 
   if (!identity) {
     return { ok: false, message: 'tender_number or url is required to identify the tender' };
@@ -59,6 +85,13 @@ export function parseImportedTender(raw: unknown, defaultOffset: string): Import
   const officialUrl = pickText(raw, ['official_url', 'officialUrl'], 2000);
   const platformUrl = pickText(raw, ['platform_url', 'platformUrl'], 2000);
   const priority = pickText(raw, ['review_priority', 'priority'], 20)?.toLowerCase();
+  const workStatus = pickText(raw, ['work_status', 'workStatus'], 40)?.toLowerCase();
+
+  if (workStatus && !STATUSES.has(workStatus)) {
+    return { ok: false, message: `Unknown work_status: ${workStatus}` };
+  }
+
+  const auctionDate = dateTime(raw.auction_date ?? raw.auctionDate, defaultOffset);
   const matchedTerms = Array.isArray(raw.matched_terms ?? raw.matchedTerms)
     ? ((raw.matched_terms ?? raw.matchedTerms) as unknown[])
         .map((term) => text(term, 100))
@@ -68,6 +101,13 @@ export function parseImportedTender(raw: unknown, defaultOffset: string): Import
 
   return {
     ok: true,
+    sourceNumber,
+    work: {
+      status: workStatus as TenderStatus | undefined,
+      comment: text(raw.comment, 5000),
+      takenAt: dateTime(raw.taken_at ?? raw.takenAt, defaultOffset),
+      auctionDate
+    },
     tender: {
       externalKey: `${source ?? 'unknown'}:${identity}`.slice(0, 500),
       title,
@@ -84,8 +124,9 @@ export function parseImportedTender(raw: unknown, defaultOffset: string): Import
         raw.deadline ?? raw.submission_deadline ?? raw.submissionDeadline,
         defaultOffset
       ),
-      auctionDate: dateTime(raw.auction_date ?? raw.auctionDate, defaultOffset),
+      auctionDate,
       procurementLaw: pickText(raw, ['procurement_law', 'procurementLaw'], 100),
+      procedureType: pickText(raw, ['procedure_type', 'procedureType'], 200),
       category: pickText(raw, ['category'], 200),
       priority: priority && PRIORITIES.has(priority) ? priority : undefined,
       officialNumber,
